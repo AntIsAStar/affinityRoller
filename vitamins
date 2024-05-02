@@ -1,0 +1,123 @@
+ local HttpService = game:GetService('HttpService')
+    local Players = game:GetService('Players')
+    local LPlayer = Players.LocalPlayer
+    local UserId = LPlayer.UserId
+    local LUserData = workspace.UserData:FindFirstChild('User_' .. UserId)
+    local Data = LUserData.Data
+
+    local Merchants = workspace:FindFirstChild('Merchants')
+    local AffinityMerchant = Merchants.AffinityMerchant
+    local Clickable = AffinityMerchant.Clickable
+    local AffinityRemote = Clickable.Retum
+
+    local Payment = getgenv().Payment or 'Gems'
+
+    local FruitAliases = {
+        DFT1 = "DevilFruit",
+        DFT2 = "DevilFruit2"
+    }
+
+    local Locks = {
+        DFT1 = {
+            Defense = false,
+            Melee = false,
+            Sniper = false,
+            Sword = false
+        },
+        DFT2 = {
+            Defense = false,
+            Melee = false,
+            Sniper = false,
+            Sword = false
+        }
+    }
+
+    local FireCount = {
+        DFT1 = 0,
+        DFT2 = 0
+    }
+
+    local function SendWebhook(Description)
+        local request = syn and syn.request or request
+        local WebhookUrl = getgenv().WebhookUrl or 'default webhook link here'
+        local Data = HttpService:JSONEncode({
+            content = '@everyone',  
+            embeds = {{
+                title = 'Affinity Statistics',
+                description = Description,
+                color = 15158332
+            }},
+            username = 'JAL'
+        })
+
+        request({
+            Url = WebhookUrl,
+            Method = 'POST',
+            Headers = {['Content-Type'] = 'application/json'},
+            Body = Data
+        })
+    end
+
+    local function AllStatsAchieved(DevilFruitPrefix)
+        for Stat, Threshold in pairs(getgenv().DesiredStats[DevilFruitPrefix]) do
+            if not Locks[DevilFruitPrefix][Stat] then
+                return false
+            end
+        end
+        return true
+    end
+
+    local function InitialStatCheckAndLock(DevilFruitPrefix)
+        local allStatsMet = true
+        
+        for Stat, Threshold in pairs(getgenv().DesiredStats[DevilFruitPrefix]) do
+            local AffinityStat = DevilFruitPrefix .. Stat
+            
+            if Data:FindFirstChild(AffinityStat) then
+                Locks[DevilFruitPrefix][Stat] = Data[AffinityStat].Value >= Threshold
+                
+                if not Locks[DevilFruitPrefix][Stat] then
+                    allStatsMet = false
+                end
+            end
+        end
+        
+        if allStatsMet then
+            SendWebhook(string.format("%s achieved all desired stats with %i spins.", Data[FruitAliases[DevilFruitPrefix]].Value, FireCount[DevilFruitPrefix]))
+            return false
+        end
+        
+        return true
+    end
+
+    local function RollFruit(DevilFruitPrefix)
+        if AllStatsAchieved(DevilFruitPrefix) then
+            -- SendWebhook(string.format("%s achieved all desired stats with %i spins.", Data[FruitAliases[DevilFruitPrefix]].Value, FireCount[DevilFruitPrefix]))
+            return false
+        end
+    
+        if not InitialStatCheckAndLock(DevilFruitPrefix) then
+            return
+        end
+        
+        AffinityRemote:FireServer(DevilFruitPrefix, Locks[DevilFruitPrefix].Defense, Locks[DevilFruitPrefix].Melee, Locks[DevilFruitPrefix].Sniper, Locks[DevilFruitPrefix].Sword, Payment)
+        FireCount[DevilFruitPrefix] = FireCount[DevilFruitPrefix] + 1
+    
+        print(DevilFruitPrefix .. " rolled with stats locked as needed.")
+        
+        local Affinities = ''
+        for Stat, Value in pairs(getgenv().DesiredStats[DevilFruitPrefix]) do
+            local AffinityStat = DevilFruitPrefix .. Stat
+    
+            Affinities = Affinities .. '\n' .. Stat .. ' (' .. (Data[AffinityStat] and Data[AffinityStat].Value or "nil") .. ')'
+        end
+        
+        return true
+    end
+    
+    while true do
+        RollFruit("DFT1")
+        RollFruit("DFT2")
+        task.wait(9)
+    end
+end
